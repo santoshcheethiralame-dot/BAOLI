@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { WELL_DEPTH, WELL_WIDTH, WATER_Y } from './stepwell.js';
-import { loadTemple, loadStepwell, loadProp, loadClusterFlat, manager } from './models.js';
+import { loadTemple, loadStepwell, loadProp, loadFlat, manager } from './models.js';
 import { createWater, mirrorBelow } from './water.js';
 import { createDust, createShafts } from './atmosphere.js';
 import { initOverlay, updateOverlay } from './overlay.js';
@@ -337,7 +337,7 @@ const ui = initUI({
 const shrineAnchor = new THREE.Vector3();
 let templeObj = null;
 let lingamObj = null;
-let lotusTemplate = null;
+let liliesPieces = null;
 let poolCentre = null;
 let poolSize = null;
 
@@ -383,12 +383,11 @@ Promise.all([
     window.__lingamSize = info.size.toArray().map((v) => +v.toFixed(2));
   }),
 
-  // --- lotus cluster, floating on the pool ---------------------------------
-  // 0.9, not 1.7: the pool is only ~15.6 x 16.6, and the first pass sized this
-  // to fill nearly a seventh of it — one clump ended up as a wall of ghost-
-  // white petals right in front of the lens during THE WATER.
-  loadClusterFlat('assets/lotus.glb', 0.9).then(({ obj }) => {
-    lotusTemplate = obj;
+  // --- water lilies, floating on the pool ---------------------------------
+  // Back to the origami pack: it is genuinely flat and Y-up already, so it
+  // floats at the waterline with no stem/orientation problem to fight.
+  loadFlat('assets/lilies.glb', 1.05).then((pieces) => {
+    liliesPieces = pieces;
   }),
 
   loadTemple('Temple_02', 8.4).then(({ obj, info, names }) => {
@@ -432,40 +431,122 @@ Promise.all([
       scene.add(deepam);
     }
 
-    // --- lotus clusters, floating on the pool ------------------------------
-    // A handful of whole, textured clusters rather than dozens of instanced
-    // pads: this asset is a composed scene (flowers + pads together), so a
-    // few real copies read as clumps of lotuses growing where the water is
-    // calm, the way they actually do — not a scattered grid of identical tiles.
-    if (lotusTemplate && poolCentre && !new URLSearchParams(location.search).has('nolotus')) {
+    // --- water lilies, floating on the pool --------------------------------
+    // Back to the origami pack, per-mesh instanced. It is already flat and
+    // Y-up, so it sits flush at the waterline with none of the stem/orient-
+    // ation fighting the standing lotus cluster needed — this asset genuinely
+    // IS a floating pad, not a bouquet.
+    if (liliesPieces && liliesPieces.length && poolCentre && !new URLSearchParams(location.search).has('nolilies')) {
+      const group = new THREE.Group();
+
+      // mulberry32, NOT a plain LCG.
+      //
+      // The previous `seed = (seed*1664525 + 1013904223) % 2**32` is textbook
+      // Marsaglia: consecutive outputs of a linear congruential generator used
+      // as coordinate PAIRS fall on a small set of parallel hyperplanes — in 2D
+      // that means the points literally line up in rows, which is exactly how
+      // the lilies were reading. It also multiplied up to ~2^52, right at JS's
+      // safe-integer limit, so the low bits were losing precision on top of it.
+      //
+      // mulberry32 uses Math.imul (no precision loss) and has no such lattice
+      // structure, so successive draws are genuinely independent in 2D.
       let seed = 20260727;
       const rnd = () => {
-        seed = (seed * 1664525 + 1013904223) % 4294967296;
-        return seed / 4294967296;
+        seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
-      const hx = poolSize.x / 2 - 1.4;
-      const hz = poolSize.z / 2 - 1.4;
+      const hx = poolSize.x / 2 - 1.2;
+      const hz = poolSize.z / 2 - 1.2;
 
-      let placed = 0, tries = 0;
-      while (placed < 5 && tries < 80) {
+      const qp = new URLSearchParams(location.search);
+      const TARGET = qp.has('lcount') ? Number(qp.get('lcount')) : 16;
+      const MIN_GAP = qp.has('lgap') ? Number(qp.get('lgap')) : 1.75;
+
+      // Poisson-disk (dart-throwing) rather than pure random. Uniform random
+      // sampling clumps — it happily drops two pads on top of each other and
+      // leaves bald patches elsewhere, which is exactly what the old scatter
+      // did. Rejecting any candidate within MIN_GAP of an accepted one gives
+      // the even, breathing spacing real lilies have on still water.
+      const spots = [];
+      let tries = 0;
+      while (spots.length < TARGET && tries < TARGET * 60) {
         tries++;
         const x = poolCentre.x + (rnd() * 2 - 1) * hx;
         const z = poolCentre.z + (rnd() * 2 - 1) * hz;
+
         // Clear of the shrine's plinth, AND clear of the camera's own approach
         // corridor (the water/shrine beats sit at world z ~= shrineAnchor.z + 8
-        // to +10.4) — the old guard only fenced off the shrine, not the lens
-        // path, which is how one clump ended up filling the frame.
-        if (Math.abs(x - shrineAnchor.x) < 5.5 && Math.abs(z - shrineAnchor.z) < 5.5) continue;
+        // to +10.4) — fencing off only the shrine let one earlier clump land
+        // dead in front of the lens.
+        if (Math.abs(x - shrineAnchor.x) < 5 && Math.abs(z - shrineAnchor.z) < 5) continue;
         if (z > shrineAnchor.z + 6.5) continue;
 
-        const clone = lotusTemplate.clone(true);
-        clone.traverse((o) => { if (o.isMesh) o.material = o.material.clone(); });
-        clone.position.set(x, WATER_Y + 0.02, z);
-        clone.rotation.y = rnd() * Math.PI * 2;
-        clone.scale.multiplyScalar(0.55 + rnd() * 0.35);
-        scene.add(clone);
-        placed++;
+        // Gap varies per candidate. A single fixed radius packs into a near
+        // lattice once the pool fills up, which reads as regular even with a
+        // good RNG — jittering it keeps the spacing organic.
+        const gap = MIN_GAP * (0.72 + rnd() * 0.55);
+        let tooClose = false;
+        for (const s of spots) {
+          const dx = s.x - x, dz = s.z - z;
+          if (dx * dx + dz * dz < gap * gap) { tooClose = true; break; }
+        }
+        if (tooClose) continue;
+
+        spots.push({
+          x, z,
+          rot: rnd() * Math.PI * 2,
+          s: 0.4 + rnd() * 0.35,
+          // Randomised, not cycled. `spots.length % pieces.length` walked the
+          // types in a fixed order, so leaf/flower alternated along whatever
+          // path the sampler happened to fill — which is the second half of
+          // why the leaves looked lined up.
+          piece: Math.floor(rnd() * liliesPieces.length) % liliesPieces.length,
+        });
       }
+
+      liliesPieces.forEach((piece, i) => {
+        const mine = spots.filter((sp) => sp.piece === i);
+        if (!mine.length) return;
+        // Rebuild the material rather than reuse the imported one — the
+        // source materials reference maps that need UV sets the cloned
+        // geometry does not carry, and three throws inside its attribute
+        // update on first render if reused directly.
+        const src = piece.material;
+        const hasUV = !!piece.geometry.attributes.uv;
+        // Leaves come through with a blank white material and no usable map,
+        // rendering as pale slabs on the water. Tint the pads green; leave
+        // the blooms whatever colour the model actually carries.
+        const isLeaf = /leaf/i.test(piece.name || '');
+        const base = isLeaf
+          ? new THREE.Color('#4e6b3a')
+          : (src && src.color ? src.color.clone() : new THREE.Color('#b0708f'));
+        const mat = new THREE.MeshStandardMaterial({
+          map: hasUV && src && src.map ? src.map : null,
+          color: base,
+          roughness: 0.86,
+          metalness: 0.0,
+          side: THREE.DoubleSide,
+          transparent: !!(src && src.transparent),
+          alphaTest: src && src.alphaTest ? src.alphaTest : 0,
+        });
+        const mesh = new THREE.InstancedMesh(piece.geometry, mat, mine.length);
+        const d = new THREE.Object3D();
+        mine.forEach((sp, j) => {
+          d.position.set(sp.x, WATER_Y + 0.03, sp.z);
+          d.rotation.set(0, sp.rot, 0);
+          d.scale.setScalar(sp.s);
+          d.updateMatrix();
+          mesh.setMatrixAt(j, d.matrix);
+        });
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        group.add(mesh);
+      });
+      scene.add(group);
     }
   })
   .catch((e) => console.error('model load failed', e))

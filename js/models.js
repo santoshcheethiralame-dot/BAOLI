@@ -231,7 +231,11 @@ export async function loadClusterFlat(url, targetSpan) {
     if (o.material) o.material.side = THREE.DoubleSide;
   });
 
-  return { obj: holder };
+  // Return the measured size: this asset is a standing cluster (stems rising
+  // from a root mass, like a bouquet), not a flat pad. Sitting it base-down at
+  // y=0 puts the whole plant above the water instead of floating on it — the
+  // caller needs the height to know how far to sink it.
+  return { obj: holder, size };
 }
 
 // The stepwell scan: 174 meshes, no textures at all. Bare geometry is the point

@@ -767,3 +767,34 @@ body {
   outline: none;
 }
 .sec-colophon .foot { margin-top: 0; }
+
+/* --- section layout balance ---------------------------------------------- */
+/* The ledger runs far taller than the paragraph beside it, which left a large
+   dead void under the left column. Narrowing that column and making it STICK
+   means it travels with the ledger instead of stranding at the top — the space
+   is now intentional breathing room rather than an accident of unequal height. */
+.sec-changed .cols {
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  align-items: start;
+}
+
+.sec-changed .cols > div:first-child {
+  position: sticky;
+  top: 22vh;
+}
+
+@media (max-width: 900px) {
+  .sec-changed .cols { grid-template-columns: 1fr; }
+  .sec-changed .cols > div:first-child { position: static; }
+}
+
+/* Content scrolls beneath the fixed topbar, so section kickers were colliding
+   with the wordmark. A short scrim keeps the bar legible without boxing it in. */
+#topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, rgba(10, 8, 6, .92) 0%, rgba(10, 8, 6, .65) 55%, transparent 100%);
+  pointer-events: none;
+}
