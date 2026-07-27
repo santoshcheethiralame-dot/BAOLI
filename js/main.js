@@ -410,7 +410,11 @@ Promise.all([
     const SANCTUM_FLOOR = -12.09;
     if (lingamObj && !new URLSearchParams(location.search).has('nolingam')) {
       // nudged right of the shrine's axis so it reads centred in the doorway
-      lingamObj.position.set(shrineAnchor.x + 0.30, SANCTUM_FLOOR - 0.04, shrineAnchor.z);
+      // +0.15, measured — not guessed. normalise() centres a model by its
+      // BOUNDING BOX, and the yoni's spout extends to one side, so the bbox
+      // centre sits right of the shaft. What must be centred in the doorway is
+      // the shaft, so the whole piece shifts to compensate.
+      lingamObj.position.set(shrineAnchor.x + 0.15, SANCTUM_FLOOR - 0.04, shrineAnchor.z);
       // the yoni's spout has to face right from the approach; the model
       // arrives pointing away
       lingamObj.rotation.y = Math.PI / 2;
