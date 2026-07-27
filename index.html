@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BAOLI — a machine built to pull the sky underground</title>
+<meta name="description" content="Descend Toorji Ka Jhalra, an eighteenth-century stepwell in Jodhpur, rendered in real time in the browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,700;6..96,900&family=Archivo:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "lenis": "https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.mjs"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- 93MB of scans take a few seconds; an unexplained black screen reads as
+     broken, a counted one reads as deliberate -->
+<div id="loader">
+  <div class="loader-mark">BAOLI</div>
+  <div class="loader-track"><span id="loader-fill"></span></div>
+  <div class="loader-pct"><span id="loader-num">0</span>%</div>
+</div>
+
+<canvas id="scene"></canvas>
+
+<div id="grain" aria-hidden="true"></div>
+<div id="vignette" aria-hidden="true"></div>
+<!-- darkens the whole render on the landing so the wordmark has something to
+     sit on; lifts as you descend and the well supplies its own shadow -->
+<div id="landing-scrim" aria-hidden="true"></div>
+
+<!-- fixed chrome: the page had no navigation of any kind before this -->
+<header id="topbar">
+  <a class="brand" href="#" aria-label="BAOLI, back to the surface">
+    <span class="brand-deva">बावड़ी</span>
+    <span class="brand-sep"></span>
+    <span class="brand-latin">BAOLI</span>
+  </a>
+  <nav class="tools">
+    <button id="sound-btn" class="tool" aria-pressed="false">
+      <span class="dot" aria-hidden="true"></span><span class="tool-label">SOUND</span>
+    </button>
+    <button id="index-btn" class="tool" aria-expanded="false" aria-controls="index-panel">
+      <span class="tool-label">INDEX</span>
+    </button>
+  </nav>
+</header>
+
+<header id="hero">
+  <div id="hero-inner">
+    <h1>BAOLI</h1>
+    <span class="hero-rule" aria-hidden="true"></span>
+    <p class="hero-sub">बावड़ी · स्टेपवेल</p>
+  </div>
+</header>
+
+<!-- bottom-left: the record. becomes the chapter title once you descend -->
+<aside id="meta">
+  <span class="meta-rule" aria-hidden="true"></span>
+  <div class="meta-title">Toorji Ka Jhalra</div>
+  <div class="meta-sub">Jodhpur · Rajasthan · c.1740</div>
+  <p class="meta-line">A machine built to pull the sky underground.</p>
+</aside>
+
+<div id="chapter-block" aria-hidden="true">
+  <div id="chapter"></div>
+  <div id="chapter-note"></div>
+</div>
+
+<!-- bottom-right: scroll cue, replaced by the depth rail as you go down -->
+<div id="scroll-cue" aria-hidden="true">
+  <span class="cue-label">SCROLL TO DESCEND</span>
+  <span class="cue-track"><span class="cue-run"></span></span>
+</div>
+
+<aside id="altimeter" aria-hidden="true">
+  <div class="rail"><div id="rail-fill"></div></div>
+  <div class="read">
+    <div id="depth">0.0 m</div>
+    <div class="sub"><span id="stage">THE SURFACE</span></div>
+  </div>
+</aside>
+
+<!-- the dialogue layer: one block per beat, mounted only while that beat holds -->
+<div id="copy" class="copy" aria-live="polite">
+  <div class="eyebrow"></div>
+  <h2 class="statement"></h2>
+  <p class="body"></p>
+</div>
+
+<nav id="index-panel" hidden aria-label="Chapters">
+  <button id="index-close" aria-label="Close index">CLOSE</button>
+  <ol id="index-list"></ol>
+  <p class="index-foot">Toorji Ka Jhalra is real. The shrine in the water is not — we placed it.</p>
+</nav>
+
+<main id="scroll-track" aria-hidden="true"></main>
+
+<!-- Below the film: the actual website. The brief asks for a site, and until
+     now the page simply ended at the shrine. -->
+<div id="after">
+
+  <section class="sec sec-changed">
+    <p class="kicker">What is real and what is not</p>
+    <h2>We changed things.</h2>
+    <div class="cols">
+      <div>
+        <p>The well is a scan of <strong>Toorji Ka Jhalra</strong> in Jodhpur, built in the 1740s by the queen consort of Maharaja Abhay Singh. The architecture you descended is really there — the flights on three sides, the pavilion wall, the jharokhas and the chhatris.</p>
+        <p>Almost nothing else is.</p>
+      </div>
+      <ul class="ledger">
+        <li><span>The shrine</span><em>Ours. A separate temple model, placed in the water. There is no shrine at Toorji Ka Jhalra.</em></li>
+        <li><span>The lingam</span><em>Ours. A third model, set on the sanctum floor.</em></li>
+        <li><span>The water level</span><em>Chosen. Held at roughly two-thirds depth because it leaves the flights readable.</em></li>
+        <li><span>The stone</span><em>Painted. The scan arrives untextured, so every colour is a shader — bleached at the rim, grimier with depth, algal at the waterline.</em></li>
+        <li><span>The desert and the dusk</span><em>Ours. The scan is a sectional model that ends in a slab.</em></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec sec-why">
+    <p class="kicker">Why stepwells stopped</p>
+    <h2>A tap is faster than four hundred steps.</h2>
+    <div class="cols">
+      <div>
+        <p>Across the twentieth century, piped supply and borewells made the walk unnecessary. Many stepwells silted up, were fenced off, or were filled in. The ones that survived largely did so as monuments rather than as infrastructure.</p>
+      </div>
+      <div>
+        <p>What was lost with them is harder to price: a cool public room in a hot city, open to anyone, that cost nothing to enter and did not belong to a household.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec sec-colophon">
+    <p class="kicker">Colophon</p>
+    <h2>How it is made.</h2>
+    <div class="cols">
+      <ul class="spec">
+        <li><span>Rendering</span><em>Three.js (WebGL2), custom GLSL for sky, water and stone staining</em></li>
+        <li><span>Scroll</span><em>Lenis, driving a twelve-beat camera table</em></li>
+        <li><span>Motion</span><em>Web Animations API</em></li>
+        <li><span>Audio</span><em>Web Audio — flute bed through a depth-driven lowpass</em></li>
+        <li><span>Type</span><em>Bodoni Moda · Archivo · Space Mono</em></li>
+        <li><span>Build</span><em>None. ES modules, no bundler</em></li>
+      </ul>
+      <ul class="spec">
+        <li><span>Well</span><em>Toorji Ka Jhalra — Jodhpur, low-poly scan</em></li>
+        <li><span>Shrine</span><em>Indian temples pack</em></li>
+        <li><span>Lingam</span><em>Lingam Essence</em></li>
+        <li><span>Lilies</span><em>Origami water lilies</em></li>
+        <li><span>Sound</span><em>Krishna flute, Krasnoshchok</em></li>
+        <li><span>Verification</span><em>puppeteer-core — every frame in this build was screenshotted and jank-tested, not eyeballed</em></li>
+      </ul>
+    </div>
+    <p class="foot">बावड़ी — built for the 3D Websites Hackathon.</p>
+  </section>
+
+</div>
+
+<noscript>
+  <p style="padding:2rem;font-family:sans-serif">BAOLI is a real-time 3D descent and needs JavaScript.</p>
+</noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
