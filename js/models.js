@@ -192,6 +192,48 @@ export async function loadFlat(url, targetSpan) {
   return pieces;
 }
 
+// A composed cluster prop (several elements arranged together in the file,
+// e.g. a lotus cluster) that should stay intact as ONE group rather than be
+// split into per-mesh instances. Textures are kept — this is not bare stone
+// that needs painting. Scaled by FOOTPRINT since it is meant to float.
+export async function loadClusterFlat(url, targetSpan) {
+  const gltf = await load(url);
+  const holder = new THREE.Group();
+  holder.add(gltf.scene);
+  holder.updateWorldMatrix(true, true);
+
+  let box = new THREE.Box3().setFromObject(holder);
+  let size = box.getSize(new THREE.Vector3());
+
+  // upright only if it is genuinely lying down (Z deeper than tall) — a cube
+  // bounding box like this one is ambiguous, so the ratio has to be decisive
+  if (size.z > size.y * 1.4) {
+    holder.rotation.x = -Math.PI / 2;
+    holder.updateWorldMatrix(true, true);
+    box = new THREE.Box3().setFromObject(holder);
+    size = box.getSize(new THREE.Vector3());
+  }
+
+  const span = Math.max(size.x, size.z);
+  holder.scale.multiplyScalar(targetSpan / span);
+  holder.updateWorldMatrix(true, true);
+
+  box = new THREE.Box3().setFromObject(holder);
+  const c = box.getCenter(new THREE.Vector3());
+  holder.position.x -= c.x;
+  holder.position.z -= c.z;
+  holder.position.y -= box.min.y;
+
+  holder.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    if (o.material) o.material.side = THREE.DoubleSide;
+  });
+
+  return { obj: holder };
+}
+
 // The stepwell scan: 174 meshes, no textures at all. Bare geometry is the point
 // — it takes whatever stone we paint on it, so the staining is driven by world
 // height (grime low, algae at the waterline) rather than baked into the file.

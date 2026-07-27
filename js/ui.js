@@ -107,16 +107,21 @@ export function initUI({ onSeek }) {
         return;
       }
       if (el.paused) return;
+      // 0.5s, not 2.6s — a long fade read as "the music starts late" even
+      // once playback had actually begun.
       gain.gain.cancelScheduledValues(ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(BASE_VOLUME, ctx.currentTime + 2.6);
+      gain.gain.linearRampToValueAtTime(BASE_VOLUME, ctx.currentTime + 0.5);
       off();
     };
+    const EVENTS = ['pointerdown', 'wheel', 'keydown', 'touchstart', 'mousemove'];
     const off = () => {
-      ['pointerdown', 'wheel', 'keydown', 'touchstart'].forEach((ev) =>
-        removeEventListener(ev, start));
+      EVENTS.forEach((ev) => removeEventListener(ev, start));
     };
-    ['pointerdown', 'wheel', 'keydown', 'touchstart'].forEach((ev) =>
-      addEventListener(ev, start, { passive: true }));
+    // mousemove added: on a desktop visitor the cursor is usually already over
+    // the page, so this is the trigger that actually fires first — waiting
+    // only on wheel/click/key meant sound didn't start until real interaction,
+    // which read as a delay even though the arm attempt ran at load.
+    EVENTS.forEach((ev) => addEventListener(ev, start, { passive: true }));
 
     // some engines allow it outright
     start();

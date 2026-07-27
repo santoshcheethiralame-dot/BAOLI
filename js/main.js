@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { WELL_DEPTH, WELL_WIDTH, WATER_Y } from './stepwell.js';
-import { loadTemple, loadStepwell, loadProp, loadFlat, manager } from './models.js';
+import { loadTemple, loadStepwell, loadProp, loadClusterFlat, manager } from './models.js';
 import { createWater, mirrorBelow } from './water.js';
 import { createDust, createShafts } from './atmosphere.js';
 import { initOverlay, updateOverlay } from './overlay.js';
@@ -337,7 +337,7 @@ const ui = initUI({
 const shrineAnchor = new THREE.Vector3();
 let templeObj = null;
 let lingamObj = null;
-let liliesPieces = null;
+let lotusTemplate = null;
 let poolCentre = null;
 let poolSize = null;
 
@@ -383,9 +383,12 @@ Promise.all([
     window.__lingamSize = info.size.toArray().map((v) => +v.toFixed(2));
   }),
 
-  // --- water lilies, floating on the pool ---------------------------------
-  loadFlat('assets/lilies.glb', 0.95).then((pieces) => {
-    liliesPieces = pieces;
+  // --- lotus cluster, floating on the pool ---------------------------------
+  // 0.9, not 1.7: the pool is only ~15.6 x 16.6, and the first pass sized this
+  // to fill nearly a seventh of it — one clump ended up as a wall of ghost-
+  // white petals right in front of the lens during THE WATER.
+  loadClusterFlat('assets/lotus.glb', 0.9).then(({ obj }) => {
+    lotusTemplate = obj;
   }),
 
   loadTemple('Temple_02', 8.4).then(({ obj, info, names }) => {
@@ -429,65 +432,40 @@ Promise.all([
       scene.add(deepam);
     }
 
-    // --- lilies -----------------------------------------------------------
-    if (liliesPieces && liliesPieces.length && poolCentre && !new URLSearchParams(location.search).has('nolilies')) {
-      const group = new THREE.Group();
+    // --- lotus clusters, floating on the pool ------------------------------
+    // A handful of whole, textured clusters rather than dozens of instanced
+    // pads: this asset is a composed scene (flowers + pads together), so a
+    // few real copies read as clumps of lotuses growing where the water is
+    // calm, the way they actually do — not a scattered grid of identical tiles.
+    if (lotusTemplate && poolCentre && !new URLSearchParams(location.search).has('nolotus')) {
       let seed = 20260727;
       const rnd = () => {
         seed = (seed * 1664525 + 1013904223) % 4294967296;
         return seed / 4294967296;
       };
-      const hx = poolSize.x / 2 - 1.2;
-      const hz = poolSize.z / 2 - 1.2;
-      const spots = [];
-      for (let i = 0; i < 34; i++) {
+      const hx = poolSize.x / 2 - 1.4;
+      const hz = poolSize.z / 2 - 1.4;
+
+      let placed = 0, tries = 0;
+      while (placed < 5 && tries < 80) {
+        tries++;
         const x = poolCentre.x + (rnd() * 2 - 1) * hx;
         const z = poolCentre.z + (rnd() * 2 - 1) * hz;
-        // keep them off the shrine's plinth
-        if (Math.abs(x - shrineAnchor.x) < 5 && Math.abs(z - shrineAnchor.z) < 5) continue;
-        spots.push({ x, z, rot: rnd() * Math.PI * 2, s: 0.38 + rnd() * 0.45 });
+        // Clear of the shrine's plinth, AND clear of the camera's own approach
+        // corridor (the water/shrine beats sit at world z ~= shrineAnchor.z + 8
+        // to +10.4) — the old guard only fenced off the shrine, not the lens
+        // path, which is how one clump ended up filling the frame.
+        if (Math.abs(x - shrineAnchor.x) < 5.5 && Math.abs(z - shrineAnchor.z) < 5.5) continue;
+        if (z > shrineAnchor.z + 6.5) continue;
+
+        const clone = lotusTemplate.clone(true);
+        clone.traverse((o) => { if (o.isMesh) o.material = o.material.clone(); });
+        clone.position.set(x, WATER_Y + 0.02, z);
+        clone.rotation.y = rnd() * Math.PI * 2;
+        clone.scale.multiplyScalar(0.55 + rnd() * 0.35);
+        scene.add(clone);
+        placed++;
       }
-      liliesPieces.forEach((piece, i) => {
-        const mine = spots.filter((_, j) => j % liliesPieces.length === i);
-        if (!mine.length) return;
-        // Rebuild the material rather than reuse the imported one. The source
-        // materials reference maps that need UV sets the cloned geometry does
-        // not carry, and three throws inside its attribute update on the first
-        // render. Only the map and colour are worth keeping.
-        const src = piece.material;
-        const hasUV = !!piece.geometry.attributes.uv;
-        // Leaves come through with a white material and no usable map, so they
-        // render as blank slabs on the water. Tint the pads; leave the blooms
-        // whatever colour the model actually carries.
-        const isLeaf = /leaf/i.test(piece.name || '');
-        const base = isLeaf
-          ? new THREE.Color('#4e6b3a')
-          : (src && src.color ? src.color.clone() : new THREE.Color('#b0708f'));
-        const mat = new THREE.MeshStandardMaterial({
-          map: hasUV && src && src.map ? src.map : null,
-          color: base,
-          roughness: 0.86,
-          metalness: 0.0,
-          side: THREE.DoubleSide,
-          transparent: !!(src && src.transparent),
-          alphaTest: src && src.alphaTest ? src.alphaTest : 0,
-        });
-        const mesh = new THREE.InstancedMesh(piece.geometry, mat, mine.length);
-        const d = new THREE.Object3D();
-        mine.forEach((sp, j) => {
-          d.position.set(sp.x, WATER_Y + 0.03, sp.z);
-          d.rotation.set(0, sp.rot, 0);
-          d.scale.setScalar(sp.s);
-          d.updateMatrix();
-          mesh.setMatrixAt(j, d.matrix);
-        });
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.castShadow = false;
-        mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
-        group.add(mesh);
-      });
-      scene.add(group);
     }
   })
   .catch((e) => console.error('model load failed', e))
