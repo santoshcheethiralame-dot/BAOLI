@@ -12,6 +12,7 @@ import { initOverlay, updateOverlay } from './overlay.js';
 import { sample, TOTAL_VH } from './beats.js';
 import { createSky } from './sky.js';
 import { initUI, revealWordmark } from './ui.js';
+import { initSection, initReveals } from './section.js';
 
 // The journey no longer ends underground, so the sky must not collapse to
 // black. It travels from hot white noon to dusk over the water.
@@ -274,6 +275,10 @@ function firstFrameSettle() {
   setTimeout(() => loaderEl.remove(), 900);
   revealWordmark();
   ui.arm();
+  initSection();
+  initReveals();
+  const again = document.getElementById('again');
+  if (again) again.addEventListener('click', () => lenis.scrollTo(0, { duration: 2.2 }));
   requestAnimationFrame(() => { window.__ready = true; });
 }
 
@@ -404,7 +409,8 @@ Promise.all([
     // guess put the lingam at -10.93 — floating up against the ceiling.
     const SANCTUM_FLOOR = -12.09;
     if (lingamObj && !new URLSearchParams(location.search).has('nolingam')) {
-      lingamObj.position.set(shrineAnchor.x, SANCTUM_FLOOR - 0.04, shrineAnchor.z);
+      // nudged right of the shrine's axis so it reads centred in the doorway
+      lingamObj.position.set(shrineAnchor.x + 0.30, SANCTUM_FLOOR - 0.04, shrineAnchor.z);
       // the yoni's spout has to face right from the approach; the model
       // arrives pointing away
       lingamObj.rotation.y = Math.PI / 2;

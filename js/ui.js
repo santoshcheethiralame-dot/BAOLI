@@ -94,13 +94,21 @@ export function initUI({ onSeek }) {
     soundBtn.classList.add('on');
 
     const start = async () => {
-      if (!on || ctx) return;
-      build();
+      if (!on) return;
+      if (!ctx) build();
       try {
         if (ctx.state === 'suspended') await ctx.resume();
         await el.play();
-        gain.gain.linearRampToValueAtTime(BASE_VOLUME, ctx.currentTime + 2.6);
-      } catch (e) { /* still blocked; the button remains a manual fallback */ }
+      } catch (e) {
+        // Still blocked. Do NOT unbind — the whole point is to keep waiting for
+        // a real gesture. The previous version called off() unconditionally, so
+        // the one speculative attempt at load consumed every listener and the
+        // bed could never start.
+        return;
+      }
+      if (el.paused) return;
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(BASE_VOLUME, ctx.currentTime + 2.6);
       off();
     };
     const off = () => {

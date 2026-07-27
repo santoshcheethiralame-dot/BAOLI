@@ -109,6 +109,7 @@
 <div id="after">
 
   <section class="sec sec-changed">
+    <span class="sec-no" aria-hidden="true">01</span>
     <p class="kicker">What is real and what is not</p>
     <h2>We changed things.</h2>
     <div class="cols">
@@ -126,7 +127,26 @@
     </div>
   </section>
 
+  <section class="sec sec-section">
+    <span class="sec-no" aria-hidden="true">02</span>
+    <p class="kicker">Try it</p>
+    <h2>The water was never in one place.</h2>
+    <div class="figure-wrap">
+      <div id="section-figure" class="figure"></div>
+      <div class="figure-ctl">
+        <label for="section-slider">Water level</label>
+        <input id="section-slider" type="range" min="0" max="100" value="36" aria-describedby="sx-state">
+        <div class="figure-read">
+          <span id="sx-depth" class="figure-depth">−12.6 m</span>
+          <span id="sx-state" class="figure-state"></span>
+        </div>
+        <p class="figure-note">Drag it. Every stepwell is designed around the fact that this line moves — the flights exist so the water is reachable at any of its heights.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="sec sec-why">
+    <span class="sec-no" aria-hidden="true">03</span>
     <p class="kicker">Why stepwells stopped</p>
     <h2>A tap is faster than four hundred steps.</h2>
     <div class="cols">
@@ -140,6 +160,7 @@
   </section>
 
   <section class="sec sec-colophon">
+    <span class="sec-no" aria-hidden="true">04</span>
     <p class="kicker">Colophon</p>
     <h2>How it is made.</h2>
     <div class="cols">
@@ -160,7 +181,10 @@
         <li><span>Verification</span><em>puppeteer-core — every frame in this build was screenshotted and jank-tested, not eyeballed</em></li>
       </ul>
     </div>
-    <p class="foot">बावड़ी — built for the 3D Websites Hackathon.</p>
+    <div class="end">
+      <button id="again" class="again">Descend again</button>
+      <p class="foot">बावड़ी — built for the 3D Websites Hackathon.</p>
+    </div>
   </section>
 
 </div>
